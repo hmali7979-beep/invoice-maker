@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invoice Maker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root { --bg:#f5f7fb; --card:#fff; --text:#111; --muted:#666; --primary:#2563eb; --danger:#dc2626; --border:#e5e7eb; }
+* { box-sizing: border-box; }
+body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin:0; background:var(--bg); color:var(--text); }
+header { background:#fff; border-bottom:1px solid var(--border); padding:16px 24px; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; z-index:10; }
+h1 { font-size:20px; margin:0; }
+button { cursor:pointer; border:none; border-radius:8px; padding:10px 16px; font-weight:600; }
+.btn-primary { background:var(--primary); color:#fff; }
+.btn-secondary { background:#eef2ff; color:var(--primary); }
+.btn-danger { background:#fee2e2; color:var(--danger); }
+.btn-sm { padding:6px 10px; font-size:13px; }
+.container { max-width:1100px; margin:24px auto; padding:0 16px; display:grid; grid-template-columns: 1fr 320px; gap:24px; }
+@media (max-width: 900px) { .container { grid-template-columns: 1fr; } }
+.card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:16px; }
+.row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+@media (max-width:600px) { .row { grid-template-columns:1fr; } }
+label { display:block; font-size:13px; font-weight:600; margin-bottom:4px; color:var(--muted); }
+input, textarea, select { width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-size:14px; }
+table { width:100%; border-collapse:collapse; margin-top:12px; }
+th, td { text-align:left; padding:8px; border-bottom:1px solid var(--border); font-size:14px; }
+th { color:var(--muted); font-weight:600; }
+.item-row input { width:100%; }
+.totals { text-align:right; margin-top:12px; }
+.totals div { margin:4px 0; }
+.grand-total { font-size:20px; font-weight:700; color:var(--primary); }
+.invoice-list { list-style:none; padding:0; margin:0; }
+.invoice-list li { padding:12px; border:1px solid var(--border); border-radius:8px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; }
+.invoice-list small { color:var(--muted); display:block; }
+.badge { font-size:11px; padding:2px 8px; border-radius:999px; font-weight:700; }
+.badge-paid { background:#dcfce7; color:#166534; }
+.badge-unpaid { background:#fef3c7; color:#92400e; }
+.modal { position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; z-index:100; }
+.modal.open { display:flex; }
+.modal-content { background:#fff; padding:24px; border-radius:12px; max-width:480px; width:90%; }
+.modal-content h2 { margin-top:0; }
+.actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:16px; }
+.watermark { position:fixed; bottom:10px; right:10px; color:#999; font-size:12px; }
+.whish-number { font-size: 24px; font-weight: 700; color: var(--primary); text-align: center; padding: 12px; background: #f0f5ff; border-radius: 8px; margin: 12px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>InvoiceMaker</h1>
+  <div>
+    <span id="planBadge" class="badge badge-unpaid">Free</span>
+    <button class="btn-secondary btn-sm" onclick="openPaywall()">Upgrade</button>
+  </div>
+</header>
+
+<div class="container">
+  <main>
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>From (Your Business)</label>
+          <input id="from" placeholder="Your Name / Business">
+        </div>
+        <div>
+          <label>To (Client)</label>
+          <input id="to" placeholder="Client Name">
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px;">
+        <div>
+          <label>Invoice #</label>
+          <input id="number" placeholder="INV-001">
+        </div>
+        <div>
+          <label>Date</label>
+          <input id="date" type="date">
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px;">
+        <div>
+          <label>Due Date</label>
+          <input id="dueDate" type="date">
+        </div>
+        <div>
+          <label>Currency</label>
+          <select id="currency">
+            <option value="USD">USD $</option>
+            <option value="EUR">EUR €</option>
+            <option value="GBP">GBP £</option>
+            <option value="LBP">LBP</option>
+            <option value="AED">AED</option>
+            <option value="SAR">SAR</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <label>Items</label>
+      <table>
+        <thead>
+          <tr><th>Description</th><th style="width:80px;">Qty</th><th style="width:100px;">Rate</th><th style="width:100px;">Amount</th><th></th></tr>
+        </thead>
+        <tbody id="itemsBody"></tbody>
+      </table>
+      <button class="btn-secondary btn-sm" style="margin-top:8px;" onclick="addItem()">+ Add Item</button>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>Discount (%)</label>
+          <input id="discount" type="number" value="0" min="0" step="0.01">
+        </div>
+        <div>
+          <label>Tax (%)</label>
+          <input id="tax" type="number" value="0" min="0" step="0.01">
+        </div>
+      </div>
+      <div style="margin-top:12px;">
+        <label>Notes</label>
+        <textarea id="notes" rows="2" placeholder="Payment details, thank you note..."></textarea>
+      </div>
+      <div class="totals">
+        <div>Subtotal: <span id="subtotal">$0.00</span></div>
+        <div>Discount: <span id="discountAmt">$0.00</span></div>
+        <div>Tax: <span id="taxAmt">$0.00</span></div>
+        <div class="grand-total">Total: <span id="total">$0.00</span></div>
+      </div>
+      <div class="actions">
+        <button class="btn-primary" onclick="saveInvoice()">Save Invoice</button>
+        <button class="btn-secondary" onclick="downloadPDF()">Download PDF</button>
+        <button class="btn-secondary" onclick="newInvoice()">New</button>
+      </div>
+    </div>
+  </main>
+
+  <aside>
+    <div class="card">
+      <h3 style="margin-top:0;">Saved Invoices</h3>
+      <ul id="invoiceList" class="invoice-list"></ul>
+    </div>
+  </aside>
+</div>
+
+<div class="modal" id="paywallModal">
+  <div class="modal-content">
+    <h2>Upgrade to Pro</h2>
+    <p>You've reached the free limit of 3 invoices this month. Pro gives you unlimited invoices, no watermark, and client saving.</p>
+    <p><strong>Price: $5.00</strong></p>
+    
+    <p style="font-size: 13px; color: #666; margin-top: 16px;">Send the payment to this Whish number:</p>
+    <div class="whish-number" id="whishNumberDisplay">+961 XX XXX XXX</div>
+    <p style="font-size: 12px; color: #888; text-align: center;">Open your Whish app → Send Money → Enter this number → Send $5</p>
+    
+    <p style="font-size: 13px; color: #666; margin-top: 16px;">After sending, enter your Whish transaction reference number or name below:</p>
+    <input id="licenseInput" placeholder="e.g. WH123456789 or Your Name">
+    
+    <div class="actions">
+      <button class="btn-primary" onclick="activateLicense()">I've Paid - Activate Pro</button>
+      <button class="btn-secondary" onclick="closePaywall()">Cancel</button>
+    </div>
+    <p style="font-size: 12px; color: #999; margin-top: 12px;">Your Pro access will be activated manually after we verify the payment.</p>
+  </div>
+</div>
+
+<div class="watermark" id="watermark">Made with InvoiceMaker</div>
+
+<script>
+// ======================================================
+// 1. SET YOUR WHISH NUMBER HERE
+// ======================================================
+const WHISH_NUMBER = "+96176340376"; // ← REPLACE THIS with your actual Whish number
+
+// 2. SET YOUR PRO PRICE
+const PRO_PRICE = "5.00"; // USD amount
+
+// ======================================================
+
+const FREE_LIMIT = 3;
+let invoices = JSON.parse(localStorage.getItem('invoices') || '[]');
+let settings = JSON.parse(localStorage.getItem('settings') || '{"pro":false,"licenseKey":"","count":0,"month":""}');
+
+function saveState() {
+  localStorage.setItem('invoices', JSON.stringify(invoices));
+  localStorage.setItem('settings', JSON.stringify(settings));
+}
+
+function currentMonth() {
+  const d = new Date();
+  return d.getFullYear() + '-' + (d.getMonth()+1);
+}
+
+function checkMonthReset() {
+  const m = currentMonth();
+  if (settings.month !== m) {
+    settings.month = m;
+    settings.count = 0;
+    saveState();
+  }
+}
+
+function fmt(amount, curr) {
+  const currency = curr || document.getElementById('currency').value;
+  const symbols = {USD:'$', EUR:'€', GBP:'£', LBP:'LBP ', AED:'AED ', SAR:'SAR '};
+  const symbol = symbols[currency] || '$';
+  return symbol + Number(amount).toFixed(2);
+}
+
+function updatePlanUI() {
+  const badge = document.getElementById('planBadge');
+  if (settings.pro) {
+    badge.textContent = 'Pro';
+    badge.className = 'badge badge-paid';
+    document.getElementById('watermark').style.display = 'none';
+  } else {
+    badge.textContent = 'Free (' + settings.count + '/' + FREE_LIMIT + ')';
+    badge.className = 'badge badge-unpaid';
+    document.getElementById('watermark').style.display = 'block';
+  }
+}
+
+function addItem(desc='', qty=1, rate=0) {
+  const tbody = document.getElementById('itemsBody');
+  const tr = document.createElement('tr');
+  tr.className = 'item-row';
+  tr.innerHTML = `
+    <td><input class="item-desc" value="${desc}" placeholder="Service or product"></td>
+    <td><input class="item-qty" type="number" value="${qty}" min="0" step="0.01" oninput="calcTotals()"></td>
+    <td><input class="item-rate" type="number" value="${rate}" min="0" step="0.01" oninput="calcTotals()"></td>
+    <td class="item-amount">$0.00</td>
+    <td><button class="btn-danger btn-sm" onclick="this.closest('tr').remove(); calcTotals();">×</button></td>
+  `;
+  tbody.appendChild(tr);
+  calcTotals();
+}
+
+function getItems() {
+  const rows = document.querySelectorAll('#itemsBody tr');
+  return Array.from(rows).map(tr => ({
+    desc: tr.querySelector('.item-desc').value,
+    qty: parseFloat(tr.querySelector('.item-qty').value) || 0,
+    rate: parseFloat(tr.querySelector('.item-rate').value) || 0,
+    amount: (parseFloat(tr.querySelector('.item-qty').value) || 0) * (parseFloat(tr.querySelector('.item-rate').value) || 0)
+  }));
+}
+
+function calcTotals() {
+  const items = getItems();
+  const subtotal = items.reduce((sum, i) => sum + i.amount, 0);
+  const discountPct = parseFloat(document.getElementById('discount').value) || 0;
+  const taxPct = parseFloat(document.getElementById('tax').value) || 0;
+  const discountAmt = subtotal * discountPct / 100;
+  const taxAmt = (subtotal - discountAmt) * taxPct / 100;
+  const total = subtotal - discountAmt + taxAmt;
+
+  document.querySelectorAll('#itemsBody tr').forEach((tr, idx) => {
+    tr.querySelector('.item-amount').textContent = fmt(items[idx].amount);
+  });
+
+  document.getElementById('subtotal').textContent = fmt(subtotal);
+  document.getElementById('discountAmt').textContent = fmt(discountAmt);
+  document.getElementById('taxAmt').textContent = fmt(taxAmt);
+  document.getElementById('total').textContent = fmt(total);
+  return { subtotal, discountAmt, taxAmt, total };
+}
+
+function newInvoice() {
+  document.getElementById('from').value = '';
+  document.getElementById('to').value = '';
+  document.getElementById('number').value = 'INV-' + String(invoices.length + 1).padStart(3, '0');
+  document.getElementById('date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('dueDate').value = '';
+  document.getElementById('discount').value = 0;
+  document.getElementById('tax').value = 0;
+  document.getElementById('notes').value = '';
+  document.getElementById('itemsBody').innerHTML = '';
+  addItem();
+  calcTotals();
+}
+
+function saveInvoice() {
+  checkMonthReset();
+  const to = document.getElementById('to').value.trim();
+  if (!to) return alert('Please enter client name.');
+  const items = getItems().filter(i => i.desc || i.qty || i.rate);
+  if (items.length === 0) return alert('Add at least one item.');
+
+  if (!settings.pro && settings.count >= FREE_LIMIT) {
+    openPaywall();
+    return;
+  }
+
+  const invoice = {
+    id: Date.now(),
+    from: document.getElementById('from').value,
+    to: to,
+    number: document.getElementById('number').value,
+    date: document.getElementById('date').value,
+    dueDate: document.getElementById('dueDate').value,
+    currency: document.getElementById('currency').value,
+    items: items,
+    discount: parseFloat(document.getElementById('discount').value) || 0,
+    tax: parseFloat(document.getElementById('tax').value) || 0,
+    notes: document.getElementById('notes').value,
+    paid: false
+  };
+
+  invoices.push(invoice);
+  if (!settings.pro) settings.count++;
+  saveState();
+  renderInvoices();
+  updatePlanUI();
+  alert('Invoice saved!');
+}
+
+function renderInvoices() {
+  const list = document.getElementById('invoiceList');
+  list.innerHTML = '';
+  invoices.slice().reverse().forEach(inv => {
+    const li = document.createElement('li');
+    li.innerHTML = `
+      <div>
+        <strong>${inv.number}</strong> — ${inv.to}<br>
+        <small>${inv.date || 'No date'} · ${fmt(inv.items.reduce((s,i)=>s+i.amount,0), inv.currency)}</small>
+      </div>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <span class="badge ${inv.paid ? 'badge-paid' : 'badge-unpaid'}">${inv.paid ? 'Paid' : 'Unpaid'}</span>
+        <button class="btn-secondary btn-sm" onclick="loadInvoice(${inv.id})">Load</button>
+        <button class="btn-danger btn-sm" onclick="deleteInvoice(${inv.id})">×</button>
+      </div>
+    `;
+    list.appendChild(li);
+  });
+}
+
+function loadInvoice(id) {
+  const inv = invoices.find(i => i.id === id);
+  if (!inv) return;
+  document.getElementById('from').value = inv.from || '';
+  document.getElementById('to').value = inv.to || '';
+  document.getElementById('number').value = inv.number || '';
+  document.getElementById('date').value = inv.date || '';
+  document.getElementById('dueDate').value = inv.dueDate || '';
+  document.getElementById('currency').value = inv.currency || 'USD';
+  document.getElementById('discount').value = inv.discount || 0;
+  document.getElementById('tax').value = inv.tax || 0;
+  document.getElementById('notes').value = inv.notes || '';
+  document.getElementById('itemsBody').innerHTML = '';
+  inv.items.forEach(i => addItem(i.desc, i.qty, i.rate));
+  calcTotals();
+}
+
+function deleteInvoice(id) {
+  if (!confirm('Delete this invoice?')) return;
+  invoices = invoices.filter(i => i.id !== id);
+  saveState();
+  renderInvoices();
+}
+
+function downloadPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const inv = {
+    from: document.getElementById('from').value,
+    to: document.getElementById('to').value,
+    number: document.getElementById('number').value,
+    date: document.getElementById('date').value,
+    dueDate: document.getElementById('dueDate').value,
+    currency: document.getElementById('currency').value,
+    items: getItems().filter(i => i.desc || i.qty || i.rate),
+    discount: parseFloat(document.getElementById('discount').value) || 0,
+    tax: parseFloat(document.getElementById('tax').value) || 0,
+    notes: document.getElementById('notes').value
+  };
+  const totals = calcTotals();
+
+  let y = 20;
+  doc.setFontSize(22);
+  doc.text('INVOICE', 14, y);
+  y += 10;
+  doc.setFontSize(10);
+  doc.text('From: ' + (inv.from || 'Your Business'), 14, y);
+  y += 6;
+  doc.text('To: ' + (inv.to || 'Client'), 14, y);
+  y += 6;
+  doc.text('Invoice #: ' + inv.number, 14, y);
+  y += 6;
+  doc.text('Date: ' + (inv.date || ''), 14, y);
+  y += 6;
+  doc.text('Due: ' + (inv.dueDate || ''), 14, y);
+  y += 12;
+
+  doc.setFontSize(10);
+  doc.text('Description', 14, y);
+  doc.text('Qty', 110, y);
+  doc.text('Rate', 130, y);
+  doc.text('Amount', 160, y);
+  y += 6;
+  doc.line(14, y, 196, y);
+  y += 6;
+
+  inv.items.forEach(item => {
+    doc.text(String(item.desc || '').substring(0, 40), 14, y);
+    doc.text(String(item.qty), 110, y);
+    doc.text(String(item.rate.toFixed(2)), 130, y);
+    doc.text(String(item.amount.toFixed(2)), 160, y);
+    y += 6;
+  });
+
+  y += 4;
+  doc.line(14, y, 196, y);
+  y += 8;
+  doc.text('Subtotal: ' + totals.subtotal.toFixed(2), 140, y);
+  y += 6;
+  doc.text('Discount: ' + totals.discountAmt.toFixed(2), 140, y);
+  y += 6;
+  doc.text('Tax: ' + totals.taxAmt.toFixed(2), 140, y);
+  y += 8;
+  doc.setFontSize(14);
+  doc.text('Total: ' + totals.total.toFixed(2), 140, y);
+
+  if (!settings.pro) {
+    doc.setFontSize(10);
+    doc.setTextColor(150);
+    doc.text('Made with InvoiceMaker', 14, 285);
+  }
+
+  doc.save('invoice-' + (inv.number || 'draft') + '.pdf');
+}
+
+function openPaywall() {
+  document.getElementById('whishNumberDisplay').textContent = WHISH_NUMBER;
+  document.getElementById('paywallModal').classList.add('open');
+}
+function closePaywall() {
+  document.getElementById('paywallModal').classList.remove('open');
+}
+function activateLicense() {
+  const ref = document.getElementById('licenseInput').value.trim();
+  if (ref.length > 0) {
+    // For now, any entry activates Pro locally.
+    // For real security, verify this against your Whish account manually.
+    settings.pro = true;
+    settings.licenseKey = ref;
+    saveState();
+    updatePlanUI();
+    closePaywall();
+    alert('Pro activated! Thank you for your payment.');
+  } else {
+    alert('Please enter your payment reference or name.');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  checkMonthReset();
+  newInvoice();
+  renderInvoices();
+  updatePlanUI();
+  document.querySelectorAll('input, select, textarea').forEach(el => {
+    el.addEventListener('input', calcTotals);
+  });
+});
+</script>
+</body>
+</html>
