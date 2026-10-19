@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastCV - ATS Resume Builder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 50; align-items: center; justify-content: center; }
+        .modal.open { display: flex; }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm sticky top-0 z-10">
+        <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <div class="bg-indigo-600 text-white p-2 rounded-lg font-bold text-xl">CV</div>
+                <h1 class="text-xl font-bold text-gray-900">FastCV Builder</h1>
+            </div>
+            <div class="flex items-center gap-4">
+                <span id="planBadge" class="text-sm font-semibold bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full">Free Version</span>
+                <button onclick="openPaywall()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition">Upgrade to Pro</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-3 gap-8">
+        
+        <!-- Form Section -->
+        <div class="md:col-span-2 space-y-6">
+            
+            <!-- Personal Info -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <h2 class="text-lg font-bold mb-4 text-gray-900 border-b pb-2">Personal Information</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                        <input type="text" id="name" placeholder="John Doe" class="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
+                        <input type="text" id="jobTitle" placeholder="Software Engineer" class="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input type="email" id="email" placeholder="john@example.com" class="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                        <input type="text" id="phone" placeholder="+961 70 123 456" class="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Experience -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <div class="flex justify-between items-center border-b pb-2 mb-4">
+                    <h2 class="text-lg font-bold text-gray-900">Work Experience</h2>
+                    <button onclick="addExperience()" class="text-sm text-indigo-600 font-semibold hover:text-indigo-800">+ Add Job</button>
+                </div>
+                <div id="experienceContainer" class="space-y-4">
+                    <!-- Dynamic experience fields go here -->
+                </div>
+            </div>
+
+            <!-- Education -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <div class="flex justify-between items-center border-b pb-2 mb-4">
+                    <h2 class="text-lg font-bold text-gray-900">Education</h2>
+                    <button onclick="addEducation()" class="text-sm text-indigo-600 font-semibold hover:text-indigo-800">+ Add Education</button>
+                </div>
+                <div id="educationContainer" class="space-y-4">
+                    <!-- Dynamic education fields go here -->
+                </div>
+            </div>
+
+            <!-- Skills -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <h2 class="text-lg font-bold mb-4 text-gray-900 border-b pb-2">Skills</h2>
+                <label class="block text-sm font-medium text-gray-700 mb-1">List your skills (comma separated)</label>
+                <textarea id="skills" rows="2" placeholder="Project Management, JavaScript, Communication, Microsoft Office" class="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+            </div>
+        </div>
+
+        <!-- Right Sidebar (Actions) -->
+        <div class="md:col-span-1">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 sticky top-24">
+                <h2 class="text-lg font-bold mb-4 text-gray-900">Generate</h2>
+                <p class="text-sm text-gray-600 mb-4">Click below to instantly generate your professional PDF CV.</p>
+                
+                <button onclick="generatePDF()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition mb-3 flex justify-center items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                    Download PDF CV
+                </button>
+                <p class="text-xs text-center text-gray-500">Free version includes a watermark.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Paywall Modal -->
+    <div id="paywallModal" class="modal">
+        <div class="bg-white rounded-xl shadow-2xl p-6 md:p-8 max-w-md w-full mx-4">
+            <h2 class="text-2xl font-bold text-gray-900 mb-2">Upgrade to FastCV Pro</h2>
+            <p class="text-gray-600 mb-6 text-sm">Remove the watermark, unlock premium templates, and download instantly.</p>
+            
+            <div class="bg-indigo-50 border border-indigo-100 rounded-lg p-4 text-center mb-6">
+                <p class="text-sm text-indigo-800 font-semibold mb-1">Price: $3.00 (One-time)</p>
+                <p class="text-xs text-indigo-600 mb-3">Send via Whish Money to:</p>
+                <div class="text-2xl font-bold text-indigo-700 tracking-wider">+96176340376</div>
+            </div>
+
+            <p class="text-sm text-gray-700 mb-2 font-medium">After sending, enter your name below:</p>
+            <input type="text" id="licenseInput" placeholder="Your Name or Ref #" class="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-indigo-500 focus:border-indigo-500">
+            
+            <div class="flex gap-3">
+                <button onclick="activatePro()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition">I've Paid - Activate Pro</button>
+                <button onclick="closePaywall()" class="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-lg transition">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // === SETTINGS ===
+        const WHISH_NUMBER = "+96176340376"; 
+        const PRICE = "3.00";
+        
+        let isPro = localStorage.getItem('cv_isPro') === 'true';
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            updateUI();
+            addExperience();
+            addEducation();
+        });
+
+        function updateUI() {
+            const badge = document.getElementById('planBadge');
+            if (isPro) {
+                badge.textContent = 'PRO MEMBER';
+                badge.className = 'text-sm font-semibold bg-green-100 text-green-800 px-3 py-1 rounded-full';
+            } else {
+                badge.textContent = 'Free Version';
+                badge.className = 'text-sm font-semibold bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full';
+            }
+        }
+
+        // Dynamic Fields
+        function addExperience() {
+            const container = document.getElementById('experienceContainer');
+            const div = document.createElement('div');
+            div.className = 'p-4 bg-gray-50 rounded-lg border border-gray-200 relative mb-4 exp-block';
+            div.innerHTML = `
+                <button onclick="this.parentElement.remove()" class="absolute top-2 right-2 text-red-500 hover:text-red-700 font-bold">&times;</button>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
+                    <input type="text" placeholder="Job Title" class="exp-title w-full p-2 border border-gray-300 rounded-md text-sm">
+                    <input type="text" placeholder="Company" class="exp-company w-full p-2 border border-gray-300 rounded-md text-sm">
+                </div>
+                <input type="text" placeholder="Dates (e.g. Jan 2020 - Present)" class="exp-dates w-full p-2 border border-gray-300 rounded-md mb-2 text-sm">
+                <textarea placeholder="Job Description / Achievements" class="exp-desc w-full p-2 border border-gray-300 rounded-md text-sm" rows="2"></textarea>
+            `;
+            container.appendChild(div);
+        }
+
+        function addEducation() {
+            const container = document.getElementById('educationContainer');
+            const div = document.createElement('div');
+            div.className = 'p-4 bg-gray-50 rounded-lg border border-gray-200 relative mb-4 edu-block';
+            div.innerHTML = `
+                <button onclick="this.parentElement.remove()" class="absolute top-2 right-2 text-red-500 hover:text-red-700 font-bold">&times;</button>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
+                    <input type="text" placeholder="Degree (e.g. BS Computer Science)" class="edu-degree w-full p-2 border border-gray-300 rounded-md text-sm">
+                    <input type="text" placeholder="University / School" class="edu-school w-full p-2 border border-gray-300 rounded-md text-sm">
+                </div>
+                <input type="text" placeholder="Graduation Year" class="edu-dates w-full p-2 border border-gray-300 rounded-md text-sm">
+            `;
+            container.appendChild(div);
+        }
+
+        // Modal Logic
+        function openPaywall() {
+            if(isPro) {
+                alert("You are already a Pro member!");
+                return;
+            }
+            document.getElementById('paywallModal').classList.add('open');
+        }
+
+        function closePaywall() {
+            document.getElementById('paywallModal').classList.remove('open');
+        }
+
+        function activatePro() {
+            const input = document.getElementById('licenseInput').value.trim();
+            if(input.length > 2) {
+                isPro = true;
+                localStorage.setItem('cv_isPro', 'true');
+                updateUI();
+                closePaywall();
+                alert("Pro Activated! You can now download your CV without a watermark.");
+            } else {
+                alert("Please enter your name or payment reference.");
+            }
+        }
+
+        // Generate PDF
+        function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Get Data
+            const name = document.getElementById('name').value || 'Your Name';
+            const jobTitle = document.getElementById('jobTitle').value || 'Job Title';
+            const email = document.getElementById('email').value || 'email@example.com';
+            const phone = document.getElementById('phone').value || 'Phone Number';
+            const skills = document.getElementById('skills').value || '';
+            
+            let yPos = 20;
+
+            // Header (Name & Title)
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(24);
+            doc.setTextColor(30, 41, 59); // Slate-800
+            doc.text(name, 14, yPos);
+            yPos += 8;
+            
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(14);
+            doc.setTextColor(79, 70, 229); // Indigo-600
+            doc.text(jobTitle, 14, yPos);
+            yPos += 8;
+            
+            // Contact Info
+            doc.setFontSize(10);
+            doc.setTextColor(100, 116, 139); // Slate-500
+            doc.text(`${email}  |  ${phone}`, 14, yPos);
+            yPos += 12;
+            
+            // Draw Line
+            doc.setDrawColor(226, 232, 240); // Slate-200
+            doc.line(14, yPos, 196, yPos);
+            yPos += 10;
+
+            // Experience Section
+            const expBlocks = document.querySelectorAll('.exp-block');
+            if(expBlocks.length > 0) {
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(14);
+                doc.setTextColor(30, 41, 59);
+                doc.text("WORK EXPERIENCE", 14, yPos);
+                yPos += 8;
+
+                expBlocks.forEach(block => {
+                    const title = block.querySelector('.exp-title').value;
+                    const company = block.querySelector('.exp-company').value;
+                    const dates = block.querySelector('.exp-dates').value;
+                    const desc = block.querySelector('.exp-desc').value;
+
+                    if(title || company) {
+                        doc.setFont("helvetica", "bold");
+                        doc.setFontSize(11);
+                        doc.setTextColor(30, 41, 59);
+                        doc.text(`${title} ${company ? 'at ' + company : ''}`, 14, yPos);
+                        
+                        doc.setFont("helvetica", "italic");
+                        doc.setFontSize(10);
+                        doc.setTextColor(100, 116, 139);
+                        doc.text(dates, 196, yPos, { align: "right" });
+                        yPos += 6;
+
+                        if(desc) {
+                            doc.setFont("helvetica", "normal");
+                            doc.setTextColor(71, 85, 105);
+                            const splitDesc = doc.splitTextToSize(desc, 180);
+                            doc.text(splitDesc, 14, yPos);
+                            yPos += (splitDesc.length * 5) + 4;
+                        }
+                    }
+                });
+                yPos += 4;
+            }
+
+            // Education Section
+            const eduBlocks = document.querySelectorAll('.edu-block');
+            if(eduBlocks.length > 0) {
+                // Check page break
+                if(yPos > 250) { doc.addPage(); yPos = 20; }
+                
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(14);
+                doc.setTextColor(30, 41, 59);
+                doc.text("EDUCATION", 14, yPos);
+                yPos += 8;
+
+                eduBlocks.forEach(block => {
+                    const degree = block.querySelector('.edu-degree').value;
+                    const school = block.querySelector('.edu-school').value;
+                    const dates = block.querySelector('.edu-dates').value;
+
+                    if(degree || school) {
+                        doc.setFont("helvetica", "bold");
+                        doc.setFontSize(11);
+                        doc.setTextColor(30, 41, 59);
+                        doc.text(degree, 14, yPos);
+                        
+                        if(dates) {
+                            doc.setFont("helvetica", "normal");
+                            doc.setFontSize(10);
+                            doc.setTextColor(100, 116, 139);
+                            doc.text(dates, 196, yPos, { align: "right" });
+                        }
+                        yPos += 6;
+
+                        if(school) {
+                            doc.setFont("helvetica", "normal");
+                            doc.setTextColor(71, 85, 105);
+                            doc.text(school, 14, yPos);
+                            yPos += 8;
+                        }
+                    }
+                });
+            }
+
+            // Skills Section
+            if(skills) {
+                if(yPos > 260) { doc.addPage(); yPos = 20; }
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(14);
+                doc.setTextColor(30, 41, 59);
+                doc.text("SKILLS", 14, yPos);
+                yPos += 8;
+
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(11);
+                doc.setTextColor(71, 85, 105);
+                const splitSkills = doc.splitTextToSize(skills, 180);
+                doc.text(splitSkills, 14, yPos);
+            }
+
+            // Add Watermark if NOT Pro
+            if(!isPro) {
+                doc.setTextColor(220, 220, 220); // Light Gray
+                doc.setFontSize(40);
+                doc.setFont("helvetica", "bold");
+                // Diagonal watermark
+                doc.text("Made with FastCV", 40, 150, { angle: 45 });
+                doc.text("Upgrade to Pro to Remove", 20, 180, { angle: 45 });
+            }
+
+            doc.save(`${name.replace(/ /g, '_')}_CV.pdf`);
+        }
+    </script>
+</body>
+</html>
